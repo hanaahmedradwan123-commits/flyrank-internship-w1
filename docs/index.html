@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Intelligence Content Refresh Research Paper</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 850px; margin: 0 auto; padding: 40px 20px; }
+        h1 { border-bottom: 2px solid #222; padding-bottom: 10px; margin-bottom: 5px; }
+        .meta { color: #666; font-size: 0.95em; margin-bottom: 30px; }
+        .abstract { background: #f8f9fa; border-left: 4px solid #0066cc; padding: 15px 20px; margin: 25px 0; font-style: italic; }
+        h2 { color: #0066cc; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top: 35px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 0.9em; color: #666; }
+    </style>
+</head>
+<body>
+
+    <h1>Predicting Content Decay in Organic Search Portfolios</h1>
+    <div class="meta">
+        <strong>Author:</strong> Hana Ahmed Radwan | 
+        <strong>Lane:</strong> Machine Learning & Search Intelligence | 
+        <strong>Date:</strong> July 30, 2026
+    </div>
+
+    <div class="abstract">
+        <strong>Abstract:</strong> High-volume organic search portfolios often suffer unnoticed traffic loss when legacy content decays. This research addresses how search operations teams can proactively identify content requiring refresh before severe traffic drops occur. Using historical Google Search performance metrics across 125,000+ content items, we engineered non-linear growth signals and trained an XGBoost classifier with positive class re-weighting. The optimized model achieved an ROC-AUC of 0.9709 and increased precision to 43.1% at an 82.9% recall threshold, outperforming a standard negative-growth baseline by over 200% in F1-score. These predictions enable FlyRank editors to prioritize high-risk pages, saving significant manual audit overhead while protecting high-value organic traffic.
+    </div>
+
+    <h2>1. Introduction & Problem Statement</h2>
+    <p>Managing large-scale content portfolios (100k+ pages across clients) makes manual monitoring of traffic loss impossible. This study supports the operational decision of prioritizing content pages for editorial updates, internal link realignment, and technical SERP health checks before traffic decay accelerates.</p>
+    <ul>
+        <li><strong>Unit of Analysis:</strong> Content item per client (<code>content_hash_id</code> level).</li>
+        <li><strong>Output:</strong> A predicted risk score (probability between 0.0 and 1.0) and a binary decision flag.</li>
+        <li><strong>Cost of Wrong Calls:</strong> False Positives waste editorial hours auditing healthy content; False Negatives result in unnoticed traffic decay and loss of client revenue.</li>
+    </ul>
+
+    <h2>2. Data & Safety</h2>
+    <p>Data was extracted from the FlyRank Hugging Face Parquet release (<code>hf://datasets/FlyRank/internship-warehouse</code>), utilizing <code>dim_clients.parquet</code> and daily performance tables in <code>fact_content_daily_performance/**/*.parquet</code>.</p>
+    <ul>
+        <li><strong>Date Windows:</strong> Historical features derived from March 2026 and April 2026; target performance evaluated in May 2026.</li>
+        <li><strong>Exclusions:</strong> <code>client_hash_id</code> and <code>content_hash_id</code> were excluded from features to prevent memorization and preserve privacy. Target month clicks (<code>clicks_m5</code>) were excluded to eliminate target leakage. Pages with &lt; 50 impressions in Month 4 were filtered out as noise.</li>
+        <li><strong>Privacy Safeguard:</strong> No domain URLs, client names, raw search queries, or PII exist within the dataset or work directory.</li>
+    </ul>
+
+    <h2>3. Methodology</h2>
+    <p><strong>Target Definition:</strong> A page is flagged as requiring refresh (<code>needs_refresh = 1</code>) if it recorded ≥ 10 clicks in Month 4 and experienced a relative click decline &gt; 25% in Month 5.</p>
+    <p>We trained an <code>XGBClassifier</code> (with <code>scale_pos_weight = 19</code> to account for the ~5% class imbalance) against an 80/20 stratified split (N<sub>train</sub> = 100,606; N<sub>test</sub> = 25,152). Features included historical clicks, impressions, SERP positions, CTRs, and relative month-over-month growth rates.</p>
+
+    <h2>4. Results</h2>
+    <p>The model demonstrated strong discrimination capability (ROC-AUC: <strong>0.9709</strong>, PR-AUC: <strong>0.5952</strong>). Below is the evaluation comparison on the exact same test split:</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Model / Approach</th>
+                <th>Cutoff</th>
+                <th>Precision</th>
+                <th>Recall</th>
+                <th>F1-Score</th>
+                <th>False Positives</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Heuristic Baseline (Click Growth &lt; 0)</td>
+                <td>N/A</td>
+                <td>0.1240</td>
+                <td>0.6120</td>
+                <td>0.2062</td>
+                <td>4,318</td>
+            </tr>
+            <tr>
+                <td>XGBoost (Default Cutoff)</td>
+                <td>0.5000</td>
+                <td>0.3746</td>
+                <td><strong>0.9920</strong></td>
+                <td>0.5437</td>
+                <td>2,065</td>
+            </tr>
+            <tr>
+                <td><strong>XGBoost (Tuned Cutoff)</strong></td>
+                <td><strong>0.8689</strong></td>
+                <td><strong>0.4308</strong></td>
+                <td>0.8292</td>
+                <td><strong>0.5672</strong></td>
+                <td><strong>1,365</strong></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>5. Limitations & Honest Framing</h2>
+    <p>This work provides <strong>directional decision support</strong> based on observed historical metrics. It does not make causal claims regarding search engine algorithmic updates or direct competitor actions.</p>
+
+    <h2>6. Ranked Action Playbook</h2>
+    <ol>
+        <li><strong>Tier 1 (High Priority - Risk Probability ≥ 0.8689):</strong> Action immediately. Queue for editorial updates, intent alignment, and internal linking.</li>
+        <li><strong>Tier 2 (Monitor - Risk Probability 0.5000 - 0.8688):</strong> Place on an automated watch list for secondary evaluation next cycle.</li>
+        <li><strong>Tier 3 (Healthy - Risk Probability &lt; 0.5000):</strong> Maintain standard maintenance schedules.</li>
+    </ol>
+
+    <h2>7. Reproducibility</h2>
+    <p>To reproduce these findings, clone the <a href="https://github.com/hanaahmedradwan123-commits/flyrank-internship-w1" target="_blank">GitHub Repository</a>, install <code>requirements.txt</code>, export your Hugging Face token, and run <code>work/notebooks/capstone.ipynb</code> sequentially.</p>
+
+    <footer>
+        <p><strong>Acknowledgments & Data Credit:</strong> Built on the <a href="https://flyrank.ai" target="_blank">FlyRank ML Internship dataset</a>.</p>
+    </footer>
+
+</body>
+</html>
